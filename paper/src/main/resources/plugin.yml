@@ -1,0 +1,11 @@
+name: HAProxyReduce
+version: 3.2.0
+main: top.zient.haproxyreduce.paper.PaperMain
+api-version: 1.20
+description: 同时支持代理和直连连接
+authors: [Wuchang325]
+load: STARTUP
+folia-supported: true
+supported-servers:
+  - Paper
+  - Folia

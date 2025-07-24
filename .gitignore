@@ -1,0 +1,32 @@
+# Gradle 相关
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+!**/src/main/**/build/
+!**/src/test/**/build/
+
+# 构建输出
+out/
+target/
+
+# IDE 配置
+.idea/
+*.iws
+*.iml
+*.ipr
+*.swp
+*.swo
+.DS_Store
+*.class
+*.kotlin_module
+
+# 日志和临时文件
+logs/
+tmp/
+*.log
+
+# 系统文件
+Thumbs.db
+.DS_Store
+
+.kotlin
