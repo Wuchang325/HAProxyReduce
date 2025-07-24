@@ -22,7 +22,6 @@ tasks {
     shadowJar {
         archiveBaseName.set("HAProxyReduce-Paper")
         archiveClassifier.set("")
-        from("src/main/resources")
 
         // 重定位避免冲突
         relocate("org.bstats", "top.zient.haproxyreduce.bukkit.bstats")
