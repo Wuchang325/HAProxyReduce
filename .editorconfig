@@ -1,0 +1,40 @@
+# EditorConfig 配置文件，用于统一不同编辑器的代码风格
+# 更多信息请参考：https://editorconfig.org/
+
+root = true
+
+# 所有文件的通用设置
+[*]
+# 使用空格而非制表符缩进
+indent_style = space
+# 缩进大小为 4 个空格（Java 项目常用约定）
+indent_size = 4
+# 换行符使用 LF（跨平台统一）
+end_of_line = lf
+# 字符集为 UTF-8
+charset = utf-8
+# 自动删除行尾多余空格
+trim_trailing_whitespace = true
+# 文件末尾添加一个空行
+insert_final_newline = true
+
+# 针对 XML 文件（如 pom.xml）
+[*.xml]
+indent_size = 4
+
+# 针对 YAML 配置文件（如 plugin.yml、bungee.yml）
+[*.yml]
+indent_size = 2  # YAML 通常使用 2 空格缩进
+trim_trailing_whitespace = false  # 保留行尾空格（YAML 中可能用于换行）
+
+# 针对 JSON 文件（如 settings.json）
+[*.json]
+indent_size = 4
+
+# 针对 Markdown 文件（README.md）
+[*.md]
+trim_trailing_whitespace = false  # 保留行尾空格（Markdown 中用于强制换行）
+
+# 针对 Java 源代码
+[*.java]
+indent_size = 4
