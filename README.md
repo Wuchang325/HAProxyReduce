@@ -21,6 +21,7 @@
 
 ## 使用
 从[Release](https://github.com/Wuchang325/HAProxyReduce/releases)下载最新版本，放入服务器的`plugins`文件夹中，重启服务器即可
+paper/folia需要安装 ProtocolLib 5.1.0 或以上版本插件
 
 ## 配置
 安装插件并重启后在`plugins/HAProxyReduce`文件夹并打开编辑`whitelist.conf`，配置ip以控制其ip是否允许启用HAProxy协议
