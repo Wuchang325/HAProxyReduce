@@ -18,9 +18,6 @@ trim_trailing_whitespace = true
 # 文件末尾添加一个空行
 insert_final_newline = true
 
-# 针对 XML 文件（如 pom.xml）
-[*.xml]
-indent_size = 4
 
 # 针对 YAML 配置文件（如 plugin.yml、bungee.yml）
 [*.yml]
