@@ -5,12 +5,12 @@ plugins {
 
 dependencies {
     implementation(project(":common"))
-    implementation("com.velocitypowered:velocity-api:3.3.0-SNAPSHOT")
+    compileOnly("com.velocitypowered:velocity-api:3.4.0-SNAPSHOT")
     implementation("io.netty:netty-codec:4.1.79.Final")
     implementation("io.netty:netty-codec-haproxy:4.1.79.Final")
     implementation("org.bstats:bstats-velocity:3.0.2")
 
-    annotationProcessor("com.velocitypowered:velocity-api:3.3.0-SNAPSHOT")
+    annotationProcessor("com.velocitypowered:velocity-api:3.4.0-SNAPSHOT")
     implementation(kotlin("stdlib-jdk8"))
 }
 
