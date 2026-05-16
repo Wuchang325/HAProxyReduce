@@ -1,0 +1,28 @@
+﻿name: HAProxyReduce
+version: ${version}
+main: top.zient.haproxyreduce.paper.PaperMain
+api-version: 1.20
+description: 同时支持代理和直连连接
+authors: [Wuchang325]
+load: STARTUP
+folia-supported: true
+supported-servers:
+  - Paper
+  - Folia
+commands:
+  haproxyreload:
+    description: 手动重载 HAProxyReduce 配置
+    usage: /<command>
+    permission: haproxyreduce.reload
+  haproxystatus:
+    description: 显示 HAProxyReduce 状态与统计
+    usage: /<command>
+    permission: haproxyreduce.status
+
+permissions:
+  haproxyreduce.reload:
+    description: 允许重载 HAProxyReduce 配置
+    default: op
+  haproxyreduce.status:
+    description: 允许查看 HAProxyReduce 状态
+    default: op

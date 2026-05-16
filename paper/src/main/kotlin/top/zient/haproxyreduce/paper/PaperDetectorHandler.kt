@@ -8,11 +8,12 @@ import io.netty.handler.codec.ProtocolDetectionState
 import io.netty.handler.codec.haproxy.HAProxyMessageDecoder
 import io.netty.handler.codec.haproxy.HAProxyProtocolVersion
 import org.slf4j.Logger
-import top.zient.haproxyreduce.common.ProxyWhitelist
+import top.zient.haproxyreduce.common.Config
+import top.zient.haproxyreduce.common.ProxyAccessControl
 
-class PaperDetectorHandler(private val logger: Logger) : ByteToMessageDecoder() {
+class PaperDetectorHandler(private val logger: Logger, private val config: Config) : ByteToMessageDecoder() {
     init {
-        setSingleDecode(true) // 仅解码一次
+        isSingleDecode = true // 仅解码一次
     }
 
     override fun decode(ctx: ChannelHandlerContext, inBuf: ByteBuf, out: MutableList<Any>) {
@@ -34,15 +35,15 @@ class PaperDetectorHandler(private val logger: Logger) : ByteToMessageDecoder() 
                     ctx.pipeline().remove(this)
                 }
                 ProtocolDetectionState.DETECTED -> {
-                    // 检查远程地址是否在白名单
+                    // 检查远程地址是否被允许
                     val remoteAddr = ctx.channel().remoteAddress()
-                    if (!ProxyWhitelist.check(remoteAddr)) {
-                        // 不在白名单：记录警告但允许连接
-                        ProxyWhitelist.getWarningFor(remoteAddr)?.let { logger.warn(it) }
+                    if (!ProxyAccessControl.isAllowed(remoteAddr)) {
+                        // 不被允许：记录警告但允许连接（使用原始IP）
+                        ProxyAccessControl.getWarningFor(remoteAddr, config)?.let { logger.warn(it) }
                         inBuf.resetReaderIndex()  // 重置读指针
                         ctx.pipeline().remove(this)  // 移除检测器但不关闭连接
                     } else {
-                        // 在白名单：替换为正式解码器
+                        // 被允许：替换为正式解码器
                         val pipeline = ctx.pipeline()
                         try {
                             pipeline.replace(this, "haproxy-decoder", HAProxyMessageDecoder())
@@ -55,7 +56,7 @@ class PaperDetectorHandler(private val logger: Logger) : ByteToMessageDecoder() 
         } catch (t: Throwable) {
             inBuf.resetReaderIndex()  // 异常时重置读指针
             logger.warn("代理检测异常", t)
-            // 注意：不再关闭连接
+            ctx.pipeline().remove(this)
         }
     }
 }

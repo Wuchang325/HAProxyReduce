@@ -1,44 +1,143 @@
 <div align="center">
-<h1>HAProxyReduce</h1>
-<p>✨ 一款为 Minecraft 服务器打造的代理兼容插件，同时支持 HAProxy 代理连接与直连连接 ✨</p>
-<a href="https://github.com/Wuchang325/HAProxyReduce/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-LGPL3.0-green" alt="license"></a>
-<a href="https://github.com/Wuchang325/HAProxyReduce/releases"><img src="https://img.shields.io/github/v/release/Wuchang325/HAProxyReduce" alt="release"></a>
-<a href="#"><img src="https://img.shields.io/badge/Velocity-3.3-blue" alt="Velocity 3.3"></a>
-<a href="#"><img src="https://img.shields.io/badge/Paper-1.20.1-green" alt="Paper 1.20.1"></a>
-<a href="#"><img src="https://img.shields.io/badge/Folia-1.20.1-purple" alt="Folia 1.20.1"></a>
-<a href="#"><img src="https://img.shields.io/badge/JDK-17-orange" alt="JDK 17"></a>
-<a href="#"><img src="https://img.shields.io/badge/Kotlin-2.2.0-red" alt="Kotlin 2.2.0"></a>
+  <h1>HAProxyReduce</h1>
+  <p>一款 Minecraft 服务器插件，为 Velocity 与 Paper/Folia 提供 HAProxy 代理协议支持。</p>
+
+  <a href="https://github.com/Wuchang325/HAProxyReduce/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-LGPL3.0-green" alt="license"></a>
+  <a href="https://github.com/Wuchang325/HAProxyReduce/releases"><img src="https://img.shields.io/github/v/release/Wuchang325/HAProxyReduce" alt="release"></a>
+  <a href="#"><img src="https://img.shields.io/badge/Velocity-3.5.0--SNAPSHOT-blue" alt="Velocity 3.5.0-SNAPSHOT"></a>
+  <a href="#"><img src="https://img.shields.io/badge/Paper-1.20.1-green" alt="Paper 1.20.1"></a>
+  <a href="#"><img src="https://img.shields.io/badge/Folia-1.20.1-purple" alt="Folia 1.20.1"></a>
+  <a href="#"><img src="https://img.shields.io/badge/JDK-21-orange" alt="JDK 21"></a>
+  <a href="#"><img src="https://img.shields.io/badge/Kotlin-2.2.0-red" alt="Kotlin 2.2.0"></a>
+  <a href="#"><img src="https://img.shields.io/badge/bStats-3.0.2-blue" alt="bStats-3.0.2"></a>
 </div>
 
-## 介绍
+## 简介
 
-本插件目的在于允许同时支持 HAProxy 代理连接与直连连接,可通过白名单设置允许启用 HAProxy 协议ip列表，支持ipv4/6双类型
+HAProxyReduce 处理 HAProxy 代理协议与直连连接的自动识别，让 Velocity 和 Paper/Folia 服务端都能正常获取真实客户端 IP。内置访问控制与配置热重载，也提供对外 API 供其他插件集成。
 
-本插件属于[HAProxyDetector](https://github.com/andylizi/haproxy-detector)插件的重写版，使用原仓库[LGPL-3.0](https://github.com/Wuchang325/HAProxyReduce#LGPL-3.0-1-ov-file)开源
+## 核心功能
 
-贡献者：
-- [Wuchang325](https://github.com/Wuchang325)
+- 支持 Velocity 与 Paper/Folia 双平台
+- 自动识别 HAProxy 代理连接与直连
+- 白名单 / 黑名单访问控制
+- 配置热重载，改完即生效
+- 对外 API，方便其他插件调用
+- 连接日志记录与调试模式
+- 底层基于 Netty，协议处理开销低
 
-## 使用
-从[Release](https://github.com/Wuchang325/HAProxyReduce/releases)下载最新版本，放入服务器的`plugins`文件夹中，重启服务器即可
-paper/folia需要安装 ProtocolLib 5.1.0 或以上版本插件
+## 安装
+
+1. 从 [Releases](https://github.com/Wuchang325/HAProxyReduce/releases) 下载对应平台的 JAR。
+2. 放入服务端 `plugins/` 目录。
+3. 重启服务端。
+
+### 平台依赖
+
+- **Paper / Folia**：建议安装 ProtocolLib 5.1.0+
+- **Velocity**：无额外依赖
+
+### 启用代理协议
+
+**Paper / Folia**
+
+编辑 `config/paper-global.yml`：
+
+```yaml
+proxies:
+  proxy-protocol: true
+```
+
+**Velocity**
+
+编辑 `velocity.toml`：
+
+```toml
+proxy-protocol = true
+```
 
 ## 配置
-安装插件并重启后在`plugins/HAProxyReduce`文件夹并打开编辑`whitelist.conf`，配置ip以控制其ip是否允许启用HAProxy协议
-### paper配置
-打开根目录下`config\paper-global.yml`文件并修改`proxies`下`proxy-protocol`的值为`true`
 
-`folia`配置方法类似
+首次启动后，在 `plugins/HAProxyReduce/` 生成 `config.yml`。
 
-### velocity配置
-打开根目录下`config\velocity.toml`文件并修改`proxy-protocol`的值为`true`
+### 示例
 
-## 问题提交
-在`issues`中提交问题
+```yaml
+whitelist:
+  mode: EMPTY_DENY_ALL
+  ips:
+    - "127.0.0.1"
+    - "192.168.1.0/24"
+    - "::1"
+
+blacklist:
+  enabled: false
+  ips: []
+
+connectionTracker:
+  timeout: 300000
+  cleanupInterval: 30
+
+hotReload:
+  enabled: true
+  checkInterval: 10
+
+logging:
+  warnOnce: true
+```
+
+### 白名单模式
+
+| 模式 | 行为 |
+|------|------|
+| `DISABLED` | 关闭白名单，只做 HAProxy 协议检测 |
+| `EMPTY_ALLOW_ALL` | 白名单为空时放行所有；非空时仅放行列表内 IP |
+| `EMPTY_DENY_ALL` | 白名单为空时拒绝所有；非空时仅放行列表内 IP |
+
+### 黑名单
+
+- 启用后，黑名单 IP 跳过 HAProxy 协议解析
+- 黑名单优先级高于白名单
+
+### 热重载
+
+开启后自动监听配置变更，改完保存即生效，无需重启。
+
+## 命令
+
+需 OP 权限：
+
+| 命令 | 说明 |
+|------|------|
+| `/haproxyreload` | 手动重载配置 |
+| `/haproxystatus` | 查看状态与统计 |
 
 ## 兼容性
-本插件在`jdk17`,`kotlin 2.2.0`下编写，运行环境不低于`jdk17`,推荐在`jdk21`下运行
 
-paper: 推荐在`paper 1.20.1+`(或其衍生端)运行，此插件已内置`folia`支持, 插件不支持`spigots`服务端
+- **JDK**：21+
+- **Paper / Folia**：1.20.1+
+- **Velocity**：3.5.0-SNAPSHOT 或兼容版本
 
-velocity: 推荐在`velocity 3.3+`(或其衍生端)运行
+不支持 Spigot、CraftBukkit 等服务端。
+
+## 问题反馈
+
+提交 Issue 时建议附上：
+
+- 服务端平台与版本
+- 插件版本
+- 完整错误日志
+- 配置文件内容
+- 重现步骤
+
+## bStats 统计
+
+Paper / Folia 平台：
+![bStats Bukkit](https://bstats.org/signatures/bukkit/HAProxyReduce.svg)
+
+Velocity 平台：
+![bStats Velocity](https://bstats.org/signatures/velocity/HAProxyReduce.svg)
+
+## 星星
+
+[![Stargazers over time](https://starchart.cc/Wuchang325/HAProxyReduce.svg?variant=adaptive)](https://starchart.cc/Wuchang325/HAProxyReduce)

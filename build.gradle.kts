@@ -2,13 +2,12 @@ plugins {
     kotlin("jvm")
 }
 allprojects {
-    group = "top.zient"
-    version = "3.2.0"
+    group = property("group").toString()
+    version = property("version").toString()
 
     repositories {
         mavenCentral()
         maven("https://repo.papermc.io/repository/maven-public/")
-        maven("https://repo.velocitypowered.com/snapshots/")
         maven("https://plugins.gradle.org/m2/")
     }
 }
@@ -18,7 +17,7 @@ subprojects {
 
     configure<JavaPluginExtension> {
         toolchain {
-            languageVersion.set(JavaLanguageVersion.of(17))
+            languageVersion.set(JavaLanguageVersion.of(21))
         }
     }
 
@@ -26,9 +25,6 @@ subprojects {
         options.encoding = "UTF-8"
     }
 }
-dependencies {
-    implementation(kotlin("stdlib-jdk8"))
-}
-repositories {
-    mavenCentral()
-}
+/*dependencies {
+*    implementation(kotlin("stdlib-jdk8"))
+}*/

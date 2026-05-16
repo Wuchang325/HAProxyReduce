@@ -1,12 +1,14 @@
 pluginManagement {
+    val kotlinVersion: String = "2.2.0"
+
     plugins {
-        kotlin("jvm") version "2.2.0"
+        kotlin("jvm") version kotlinVersion
     }
 }
 plugins {
     id("org.gradle.toolchains.foojay-resolver-convention") version "0.8.0"
 }
-rootProject.name = "haproxy-reduce"
+rootProject.name = "HAProxyReduce"
 
 include(":common")
 include(":velocity")

@@ -1,7 +1,13 @@
 plugins {
     kotlin("jvm")
-    id("com.github.johnrengelman.shadow") version "8.1.1"
+    id("com.gradleup.shadow") version "8.3.5"
 }
+
+val nettyVersion: String = findProperty("nettyVersion") as String? ?: "4.1.79.Final"
+val paperApiVersion: String = findProperty("paperApiVersion") as String? ?: "1.20.1-R0.1-SNAPSHOT"
+val spigotApiVersion: String = findProperty("spigotApiVersion") as String? ?: "1.20.1-R0.1-SNAPSHOT"
+val protocolLibVersion: String = findProperty("protocolLibVersion") as String? ?: "5.4.0"
+val bstatsBukkitVersion: String = findProperty("bstatsBukkitVersion") as String? ?: "3.0.2"
 
 dependencies {
     // 依赖Common模块
@@ -9,12 +15,12 @@ dependencies {
         //isTransitive = false
     }
 
-    compileOnly("org.spigotmc:spigot-api:1.20.1-R0.1-SNAPSHOT")
-    compileOnly("io.papermc.paper:paper-api:1.20.1-R0.1-SNAPSHOT")
-    compileOnly("net.dmulloy2:ProtocolLib:5.4.0")
-    implementation("io.netty:netty-codec:4.1.79.Final")
-    implementation("io.netty:netty-codec-haproxy:4.1.79.Final")
-    implementation("org.bstats:bstats-bukkit:3.0.2")
+    compileOnly("org.spigotmc:spigot-api:$spigotApiVersion")
+    compileOnly("io.papermc.paper:paper-api:$paperApiVersion")
+    compileOnly("net.dmulloy2:ProtocolLib:$protocolLibVersion")
+    implementation("io.netty:netty-codec:$nettyVersion")
+    implementation("io.netty:netty-codec-haproxy:$nettyVersion")
+    implementation("org.bstats:bstats-bukkit:$bstatsBukkitVersion")
     implementation(kotlin("stdlib-jdk8"))
 }
 
@@ -30,6 +36,12 @@ tasks {
         mergeServiceFiles()
     }
 
+    processResources {
+        filesMatching("paper-plugin.yml") {
+            expand(mapOf("version" to project.version))
+        }
+    }
+
     build {
         dependsOn(shadowJar)
     }
@@ -43,5 +55,5 @@ repositories {
 }
 
 kotlin {
-    jvmToolchain(17)
+    jvmToolchain(21)
 }

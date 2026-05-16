@@ -1,85 +1,120 @@
 package top.zient.haproxyreduce.common
 
-import java.io.IOException
 import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.SocketAddress
-import java.nio.charset.StandardCharsets
-import java.nio.file.Files
-import java.nio.file.Path
+import java.util.concurrent.atomic.AtomicReference
+import top.zient.haproxyreduce.common.LogMessages
 
-class ProxyWhitelist private constructor(private val entries: List<CIDR>) {
-    fun matches(address: InetAddress): Boolean {
-        return entries.any { it.contains(address) }
+/**
+ * 代理白名单管理器（基于 YAML 配置）
+ */
+class ProxyWhitelist private constructor(
+    private val entries: List<CIDR>,
+    private val mode: Config.WhitelistMode
+) {
+    /**
+     * 检查地址是否应该解析 HAProxy 协议
+     * @return true = 解析协议, false = 跳过解析（使用原始IP）
+     */
+    fun shouldParseHAProxy(address: SocketAddress): Boolean {
+        return when (mode) {
+            Config.WhitelistMode.DISABLED -> true
+            Config.WhitelistMode.EMPTY_ALLOW_ALL -> true
+            Config.WhitelistMode.EMPTY_DENY_ALL -> {
+                // 空列表时拒绝所有
+                if (entries.isEmpty()) return false
+                checkAddress(address)
+            }
+        }
     }
 
-    val size: Int get() = entries.size
+    /**
+     * 检查地址是否在白名单中
+     */
+    fun checkAddress(address: SocketAddress): Boolean {
+        return when (mode) {
+            Config.WhitelistMode.DISABLED -> true
+            Config.WhitelistMode.EMPTY_ALLOW_ALL -> {
+                if (entries.isEmpty()) return true
+                matches(address)
+            }
+            Config.WhitelistMode.EMPTY_DENY_ALL -> {
+                if (entries.isEmpty()) return false
+                matches(address)
+            }
+        }
+    }
+
+    private fun matches(address: SocketAddress): Boolean {
+        return (address as? InetSocketAddress)?.address?.let { addr ->
+            entries.any { it.contains(addr) }
+        } ?: false
+    }
 
     companion object {
-        @Volatile // 增加volatile保证线程可见性
+        @Volatile
         var whitelist: ProxyWhitelist? = null
-        private var lastWarning: InetAddress? = null
+            private set
+
+        private val lastWarningRef = AtomicReference<InetAddress>()
 
         /**
-         * 检查地址是否在白名单中
-         * 现在只用于记录，不再拒绝连接
+         * 从 Config 加载白名单
          */
-        fun check(address: SocketAddress): Boolean {
-            return whitelist?.let {
-                (address as? InetSocketAddress)?.address?.let { addr ->
-                    it.matches(addr)
-                } ?: false // 非InetSocketAddress类型返回false
-            } ?: false // 白名单未初始化时返回false
-        }
-
-        fun getWarningFor(address: SocketAddress): String? {
-            val inetAddr = (address as? InetSocketAddress)?.address ?: return null
-            // 避免重复打印相同警告
-            if (inetAddr != lastWarning) {
-                lastWarning = inetAddr
-                return "检测到来自 ${inetAddr.hostAddress} 的代理连接，但该地址不在白名单中（使用原始IP）"
-            }
-            return null
-        }
-
-        @Throws(IOException::class)
-        fun load(path: Path): ProxyWhitelist {
-            val entries = mutableListOf<CIDR>()
-            Files.newBufferedReader(path, StandardCharsets.UTF_8).use { reader ->
-                var firstLine = true
-                reader.lineSequence().forEach { line ->
-                    val trimmed = line.trim()
-                    when {
-                        trimmed.isEmpty() || trimmed.startsWith("#") -> return@forEach
-                        firstLine && trimmed.startsWith("YesIReallyWantToDisableWhitelist") -> {
-                            return ProxyWhitelist(emptyList())
-                        }
-                        else -> entries.addAll(CIDR.parse(trimmed))
-                    }
-                    firstLine = false
+        fun load(config: Config): ProxyWhitelist {
+            val entries = config.whitelist.ips.flatMap { cidrStr ->
+                try {
+                    CIDR.parse(cidrStr)
+                } catch (e: Exception) {
+                    emptyList()
                 }
             }
-            return ProxyWhitelist(entries)
+
+            return ProxyWhitelist(entries, config.whitelist.mode).also {
+                whitelist = it
+            }
         }
 
-        @Throws(IOException::class)
-        fun loadOrDefault(path: Path): ProxyWhitelist {
-            Files.createDirectories(path.parent)
-            if (!Files.exists(path) || Files.isDirectory(path)) {
-                Files.write(path, listOf(
-                    "# 允许的代理IP列表",
-                    "#",
-                    "# 空列表将允许所有代理连接但使用原始IP",
-                    "# 每行可以是IP地址、域名或CIDR格式",
-                    "# 域名仅在启动时解析一次",
-                    "# 每个域名解析的所有IP都会被允许",
-                    "# 域名中不能使用CIDR前缀",
-                    "",
-                    "127.0.0.0/8",
-                    "::1/128"
-                ), StandardCharsets.UTF_8)
+        /**
+         * 检查是否应该解析 HAProxy 协议（静态便捷方法）
+         */
+        fun shouldParse(address: SocketAddress?): Boolean {
+            address ?: return false
+            return whitelist?.shouldParseHAProxy(address) ?: false
+        }
+
+        /**
+         * 检查地址是否在白名单中（静态便捷方法）
+         */
+        fun check(address: SocketAddress?): Boolean {
+            address ?: return false
+            return whitelist?.checkAddress(address) ?: false
+        }
+
+        /**
+         * 获取警告信息（用于日志记录，遵循 warnOnce 设置）
+         */
+        fun getWarningFor(address: SocketAddress?, config: Config): String? {
+            address ?: return null
+            if (!config.logging.warnOnce) {
+                val inetAddr = (address as? InetSocketAddress)?.address
+                return inetAddr?.let { LogMessages.PROXY_CONNECTION_NOT_WHITELISTED.format(it.hostAddress) }
             }
-            return load(path)
+
+            val inetAddr = (address as? InetSocketAddress)?.address ?: return null
+            val previous = lastWarningRef.getAndSet(inetAddr)
+
+            return if (inetAddr != previous) {
+                LogMessages.PROXY_CONNECTION_NOT_WHITELISTED.format(inetAddr.hostAddress)
+            } else null
+        }
+
+        /**
+         * 获取当前模式描述
+         */
+        fun getModeDescription(): String {
+            return whitelist?.mode?.name ?: "未加载"
         }
     }
 }

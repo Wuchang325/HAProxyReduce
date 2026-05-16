@@ -10,8 +10,12 @@ import org.bukkit.event.server.ServerLoadEvent
 import org.bukkit.plugin.java.JavaPlugin
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
-import top.zient.haproxyreduce.common.MetricsId.createWhitelistCountChart
-import top.zient.haproxyreduce.common.ProxyWhitelist
+import top.zient.haproxyreduce.api.HAProxyReduceAPIImpl
+import top.zient.haproxyreduce.common.Config
+import top.zient.haproxyreduce.common.ConfigHotReloader
+import top.zient.haproxyreduce.common.LogMessages
+import top.zient.haproxyreduce.common.MetricsId
+import top.zient.haproxyreduce.common.ProxyAccessControl
 import java.lang.reflect.Field
 import java.lang.reflect.InvocationHandler
 import java.lang.reflect.Method
@@ -25,6 +29,8 @@ class PaperMain : JavaPlugin(), Listener {
     private var handlerField: Field? = null
     private var injectorInitializer: ChannelInboundHandler? = null
     private var originalHandler: ChannelInboundHandler? = null
+    private lateinit var config: Config
+    private lateinit var hotReloader: ConfigHotReloader
 
     override fun onLoad() {
         dataDir = dataFolder.toPath()
@@ -33,55 +39,146 @@ class PaperMain : JavaPlugin(), Listener {
 
     override fun onEnable() {
         // 仅支持 Paper 和 Folia
-        if (serverType !== "Paper" && serverType !== "Folia") {
-            logger.error("此插件仅支持 Paper 或 Folia 服务端，当前服务端类型: " + serverType)
-            getServer().getPluginManager().disablePlugin(this)
+        if (serverType != "Paper" && serverType != "Folia") {
+        logger.error(LogMessages.UNSUPPORTED_SERVER_TYPE, serverType)
+            server.pluginManager.disablePlugin(this)
             return
         }
 
-        logger.info("检测到服务端环境: " + serverType)
-        getServer().getPluginManager().registerEvents(this, this)
+        logger.info(LogMessages.SERVER_ENVIRONMENT_DETECTED, serverType)
+
+        if (!isProxyProtocolEnabled()) {
+            logger.error(LogMessages.PROXY_PROTOCOL_NOT_ENABLED)
+            server.pluginManager.disablePlugin(this)
+            return
+        }
+
+        server.pluginManager.registerEvents(this, this)
 
         // 检查 ProtocolLib
-        if (getServer().getPluginManager().getPlugin("ProtocolLib") == null) {
-            logger.error("未找到 ProtocolLib 插件，请安装 ProtocolLib 5.1.0 或更高版本")
-            getServer().getPluginManager().disablePlugin(this)
+        if (server.pluginManager.getPlugin("ProtocolLib") == null) {
+            logger.error(LogMessages.PROTOCOL_LIB_NOT_FOUND)
+            server.pluginManager.disablePlugin(this)
             return
         }
 
-        // 加载白名单
-        val whitelist: ProxyWhitelist
+        // 加载配置
         try {
-            whitelist = ProxyWhitelist.loadOrDefault(dataDir!!.resolve("whitelist.conf"))
+            config = Config.load(dataDir!!.resolve("config.yml"))
+            logger.info(LogMessages.CONFIG_LOADED, config.whitelist.mode)
         } catch (e: Exception) {
-            logger.error("加载白名单配置失败，插件将禁用", e)
-            getServer().getPluginManager().disablePlugin(this)
+            logger.error(LogMessages.CONFIG_LOAD_FAILED, e)
+            server.pluginManager.disablePlugin(this)
             return
         }
-        ProxyWhitelist.whitelist = whitelist
 
-        if (whitelist.size === 0) {
-            logger.warn("代理白名单为空，将禁止所有代理连接！")
+        // 初始化API
+        HAProxyReduceAPIImpl.create(dataDir!!.resolve("config.yml"), config)
+
+        // 初始化访问控制
+        ProxyAccessControl.load(config)
+
+        // 显示配置信息
+        when (config.whitelist.mode) {
+            Config.WhitelistMode.EMPTY_DENY_ALL -> {
+                if (config.whitelist.ips.isEmpty()) {
+                    logger.warn(LogMessages.WHITELIST_MODE_EMPTY_DENY_ALL_WARNING)
+                } else {
+                    logger.info(LogMessages.WHITELIST_RULES_LOADED, config.whitelist.ips.size)
+                }
+            }
+            Config.WhitelistMode.EMPTY_ALLOW_ALL -> {
+                logger.info(LogMessages.WHITELIST_MODE_EMPTY_ALLOW_ALL)
+                if (config.whitelist.ips.isNotEmpty()) {
+                    logger.info(LogMessages.WHITELIST_RULES_LOADED, config.whitelist.ips.size)
+                }
+            }
+            Config.WhitelistMode.DISABLED -> {
+                logger.info(LogMessages.WHITELIST_MODE_DISABLED)
+            }
+        }
+
+        if (config.blacklist.enabled) {
+            logger.info(LogMessages.BLACKLIST_ENABLED, config.blacklist.ips.size)
+        } else {
+            logger.info(LogMessages.BLACKLIST_DISABLED)
         }
 
         initMetrics()
 
+        // 启动热重载
+        hotReloader = ConfigHotReloader(dataDir!!.resolve("config.yml"), logger) { newConfig ->
+            config = newConfig
+            ProxyAccessControl.load(config)
+            logger.info(LogMessages.CONFIG_RELOAD_COMPLETE + ": ${ProxyAccessControl.getModeDescription()}")
+        }
+        hotReloader.start(config)
+
+        // 注册命令
+        val cmdExecutor = PaperCommands(this)
+        this.getCommand("haproxyreload")?.setExecutor(cmdExecutor)
+        this.getCommand("haproxystatus")?.setExecutor(cmdExecutor)
+
         if (!inject()) {
-            logger.error("通道处理器注入失败，插件无法正常工作")
-            getServer().getPluginManager().disablePlugin(this)
+            logger.error(LogMessages.CHANNEL_INJECTION_FAILED)
+            server.pluginManager.disablePlugin(this)
             return
         }
 
-        logger.info("HAProxyReduce 已启用 (" + serverType + " 环境)")
+        logger.info(LogMessages.PLUGIN_ENABLED + " ($serverType 环境)")
     }
+
+    private fun isProxyProtocolEnabled(): Boolean {
+        return try {
+            // Paper 使用 paper-global.yml 中的配置
+            // 通过反射访问 PaperConfiguration 或类似配置类
+            val paperConfigClass = Class.forName("io.papermc.paper.configuration.GlobalConfiguration")
+            val getMethod = paperConfigClass.getMethod("get")
+            val globalConfig = getMethod.invoke(null)
+
+            // 访问 proxies.proxy-protocol
+            val proxyClass = Class.forName("io.papermc.paper.configuration.GlobalConfiguration\$Proxies")
+            val proxiesField = paperConfigClass.getDeclaredField("proxies")
+            proxiesField.isAccessible = true
+            val proxies = proxiesField.get(globalConfig)
+
+            val proxyProtocolField = proxyClass.getDeclaredField("proxyProtocol")
+            proxyProtocolField.isAccessible = true
+            proxyProtocolField.getBoolean(proxies)
+        } catch (e: Exception) {
+            logger.warn(LogMessages.PROXY_PROTOCOL_DETECTION_FAILED, e)
+            // 备用方法：检查系统属性或配置文件
+            checkProxyProtocolInConfig()
+        }
+    }
+    private fun checkProxyProtocolInConfig(): Boolean {
+        return try {
+            val configFile = dataDir!!.parent.parent.resolve("config/paper-global.yml").toFile()
+            if (!configFile.exists()) {
+                // 尝试 Folia 配置
+                val foliaConfig = dataDir!!.parent.parent.resolve("config/folia-global.yml").toFile()
+                if (foliaConfig.exists()) {
+                    foliaConfig.readText().contains("proxy-protocol: true")
+                } else {
+                    false
+                }
+            } else {
+                configFile.readText().contains("proxy-protocol: true")
+            }
+        } catch (e: Exception) {
+            logger.warn(LogMessages.PROXY_PROTOCOL_READ_FAILED, e)
+            false
+        }
+    }
+
 
     @EventHandler
     fun onServerLoaded(event: ServerLoadEvent?) {
-        logger.info("服务器启动完成，HAProxyReduce 运行中")
+        logger.info(LogMessages.SERVER_STARTUP_COMPLETE)
     }
 
     private fun initMetrics() {
-        Metrics(this, 14444).addCustomChart(createWhitelistCountChart())
+        Metrics(this, 31334).addCustomChart(MetricsId.createWhitelistCountChart())
     }
 
     private fun detectServerType(): String {
@@ -103,7 +200,7 @@ class PaperMain : JavaPlugin(), Listener {
      */
     private fun inject(): Boolean {
         try {
-            uninject() // 先尝试解除之前的注入
+            uninject()
 
             val networkManagerInjectorClass =
                 Class.forName("com.comphenix.protocol.injector.netty.manager.NetworkManagerInjector")
@@ -133,7 +230,7 @@ class PaperMain : JavaPlugin(), Listener {
                 object : InvocationHandler {
                     @Throws(Throwable::class)
                     override fun invoke(proxy: Any?, method: Method, args: Array<Any?>): Any? {
-                        if ("channelActive" == method.getName() && args.size > 0 && args[0] is ChannelHandlerContext) {
+                        if ("channelActive" == method.name && args.isNotEmpty() && args[0] is ChannelHandlerContext) {
                             val ctx = args[0] as ChannelHandlerContext
                             // 恢复原始处理器并注入我们的检测器
                             ctx.pipeline().remove(proxy as ChannelHandler?)
@@ -148,8 +245,12 @@ class PaperMain : JavaPlugin(), Listener {
                 }
             ) as ChannelInboundHandler
 
-            handlerField!!.set(injectorInitializer, proxyHandler)
-            logger.debug("通道处理器注入成功")
+            val field = handlerField ?: run {
+                logger.error(LogMessages.HANDLER_FIELD_NULL)
+                return false
+            }
+            field.set(injectorInitializer, proxyHandler)
+            logger.debug(LogMessages.CHANNEL_INJECTION_SUCCESS)
             return true
         } catch (e: Exception) {
             logger.error("注入处理器失败", e)
@@ -174,7 +275,7 @@ class PaperMain : JavaPlugin(), Listener {
                 }
 
                 // 添加我们的检测器
-                val detector = PaperDetectorHandler(logger)
+                val detector = PaperDetectorHandler(logger, config)
                 try {
                     pipeline.addAfter("timeout", "haproxy-detector", detector)
                 } catch (e: NoSuchElementException) {
@@ -207,8 +308,16 @@ class PaperMain : JavaPlugin(), Listener {
     }
 
     override fun onDisable() {
+        // 停止热重载
+        if (::hotReloader.isInitialized) {
+            hotReloader.stop()
+        }
+
+        // 清理API实例
+        HAProxyReduceAPIImpl.destroy()
+
         uninject()
-        logger.info("HAProxyReduce 已禁用")
+        logger.info(LogMessages.PLUGIN_DISABLED)
     }
 
     companion object {

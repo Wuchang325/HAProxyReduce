@@ -14,8 +14,17 @@ class CIDR private constructor(val address: InetAddress, val prefix: Int) {
         require(prefix >= 0) { "前缀长度不能为负数" }
         require(prefix <= bytesLen * 8) { "无效的前缀长度: $prefix" }
 
-        val buf = ByteArray(bytesLen) { 0xFF.toByte() }
-        mask = BigInteger(1, buf).shiftRight(prefix).not()
+        val totalBits = bytesLen * 8
+
+        // 计算掩码
+        mask = if (prefix == 0) {
+            BigInteger.ZERO
+        } else {
+            val allOnes = BigInteger.ONE.shiftLeft(totalBits).subtract(BigInteger.ONE)
+            allOnes.shiftRight(totalBits - prefix)
+        }
+
+        // 计算 network 地址
         network = BigInteger(1, address.address).and(mask)
     }
 
@@ -42,6 +51,12 @@ class CIDR private constructor(val address: InetAddress, val prefix: Int) {
             if (idx != -1) {
                 val addrPart = cidr.substring(0, idx)
                 require(addrPart.isNotEmpty()) { "无效的CIDR格式: \"$cidr\"" }
+
+                // 域名检查
+                if (addrPart.any { it.isLetter() }) {
+                    throw IllegalArgumentException("域名不能使用CIDR格式: $cidr")
+                }
+
                 require(InetAddressValidator.getInstance().isValid(addrPart)) {
                     "CIDR必须包含有效的IP地址: $addrPart"
                 }

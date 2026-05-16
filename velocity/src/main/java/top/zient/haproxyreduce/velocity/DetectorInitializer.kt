@@ -4,11 +4,15 @@ import io.netty.channel.Channel
 import io.netty.channel.ChannelInitializer
 import io.netty.handler.codec.haproxy.HAProxyMessageDecoder
 import org.slf4j.Logger
+import top.zient.haproxyreduce.common.Config
+import top.zient.haproxyreduce.common.LogMessages
 import java.lang.invoke.MethodHandle
 import java.lang.invoke.MethodHandles
+import java.lang.reflect.Field
 
 class DetectorInitializer(
     private val logger: Logger,
+    private val config: Config,
     private val delegate: ChannelInitializer<Channel>
 ) : ChannelInitializer<Channel>() {
 
@@ -24,19 +28,38 @@ class DetectorInitializer(
         try {
             INIT_CHANNEL.invoke(delegate, ch)
         } catch (e: Throwable) {
-            logger.error("初始化通道失败", e)
+            logger.error(LogMessages.CHANNEL_INIT_FAILED, e)
             return
         }
 
         val pipeline = ch.pipeline()
-        if (!ch.isOpen || pipeline.get("haproxy-detector") != null) return
+
+        if (!ch.isOpen) {
+            logger.debug(LogMessages.CHANNEL_CLOSED_SKIP_INJECTION)
+            return
+        }
+
+        if (pipeline.get("haproxy-detector") != null) {
+            logger.debug(LogMessages.DETECTOR_ALREADY_EXISTS)
+            return
+        }
+
+        val decoder = pipeline.get(HAProxyMessageDecoder::class.java)
+
+        if (decoder == null) {
+            logger.error(LogMessages.DECODER_NOT_FOUND)
+            throw IllegalStateException(
+                "HAProxy 支持未启用。请在 velocity.toml 中设置 proxy-protocol = true"
+            )
+        }
 
         try {
-            val decoder = pipeline.get(HAProxyMessageDecoder::class.java)
-            pipeline.replace(decoder, "haproxy-detector", HAProxyDetectorHandler(logger))
+            // 传递 config 给 HAProxyDetectorHandler
+            pipeline.replace(decoder, "haproxy-detector", HAProxyDetectorHandler(logger, config))
+            logger.debug(LogMessages.DETECTOR_INJECTION_SUCCESS)
         } catch (e: Exception) {
-            logger.error("未启用HAProxy支持", e)
-            throw RuntimeException("未启用HAProxy支持", e)
+            logger.error(LogMessages.DECODER_REPLACEMENT_FAILED, e)
+            throw IllegalStateException("注入 HAProxy 检测器失败", e)
         }
     }
 }
