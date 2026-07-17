@@ -32,23 +32,14 @@ kotlin {
    }
 }
 
-tasks.register<Copy>("processPluginJson") {
-   group = "build"
-   description = "处理 velocity-plugin.json 中的版本变量"
-
-   from("src/main/resources") {
-       include("velocity-plugin.json")
-       filter { line ->
-           line.replace("\${project.version}", rootProject.version.toString())
-               .replace("\${project.name}", project.name.toString())
-       }
-   }
-   into(layout.buildDirectory.dir("generated/resources/main"))
-}
-
 tasks.processResources {
-   dependsOn("processPluginJson")
-   exclude("velocity-plugin.json")
+    duplicatesStrategy = DuplicatesStrategy.INCLUDE
+    filesMatching("velocity-plugin.json") {
+        filter { line ->
+            line.replace("\${project.version}", rootProject.version.toString())
+                .replace("\${project.name}", project.name.toString())
+        }
+    }
 }
 
 sourceSets.main {
