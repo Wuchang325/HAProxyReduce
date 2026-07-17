@@ -18,8 +18,8 @@ dependencies {
     compileOnly("org.spigotmc:spigot-api:$spigotApiVersion")
     compileOnly("io.papermc.paper:paper-api:$paperApiVersion")
     compileOnly("net.dmulloy2:ProtocolLib:$protocolLibVersion")
-    implementation("io.netty:netty-codec:$nettyVersion")
-    implementation("io.netty:netty-codec-haproxy:$nettyVersion")
+    compileOnly("io.netty:netty-codec:$nettyVersion")
+    compileOnly("io.netty:netty-codec-haproxy:$nettyVersion")
     implementation("org.bstats:bstats-bukkit:$bstatsBukkitVersion")
     implementation(kotlin("stdlib-jdk8"))
 }
