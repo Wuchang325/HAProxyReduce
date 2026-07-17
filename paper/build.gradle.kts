@@ -1,6 +1,6 @@
 plugins {
     kotlin("jvm")
-    id("com.gradleup.shadow") version "8.3.5"
+    id("com.gradleup.shadow") version "9.6.0"
 }
 
 val nettyVersion: String = findProperty("nettyVersion") as String? ?: "4.1.79.Final"
