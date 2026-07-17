@@ -1,8 +1,5 @@
 /*
- * Copyright (C) 2026 Jones Development
- *
- * All rights reserved.
- * This software is proprietary and cannot be copied, modified, or distributed without explicit permission.
+ * Taken from apache commons 2.1.
  */
 
 package top.zient.haproxyreduce.common;
