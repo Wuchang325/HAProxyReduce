@@ -18,8 +18,8 @@ repositories {
 dependencies {
    implementation(project(":common"))
    compileOnly("com.velocitypowered:velocity-api:$velocityApiVersion")
-   implementation("io.netty:netty-codec:$nettyVersion")
-   implementation("io.netty:netty-codec-haproxy:$nettyVersion")
+   compileOnly("io.netty:netty-codec:$nettyVersion")
+   compileOnly("io.netty:netty-codec-haproxy:$nettyVersion")
    implementation("org.yaml:snakeyaml:$snakeYamlVersion")
    implementation("org.bstats:bstats-velocity:$bstatsVelocityVersion")
    implementation(kotlin("stdlib"))
