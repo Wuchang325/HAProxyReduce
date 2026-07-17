@@ -9,18 +9,6 @@
     {
       "id": "sonar",
       "optional": true
-    },
-    {
-      "id": "librelogin",
-      "optional": true
-    },
-    {
-      "id": "nlogin",
-      "optional": true
-    },
-    {
-      "id": "nantibot",
-      "optional": true
     }
   ]
 }
