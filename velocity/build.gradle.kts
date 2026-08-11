@@ -1,6 +1,6 @@
 plugins {
    kotlin("jvm")
-   id("com.gradleup.shadow") version "8.3.5"
+   id("com.gradleup.shadow") version "9.6.0"
 }
 
 val nettyVersion: String = findProperty("nettyVersion") as String? ?: "4.1.79.Final"
@@ -18,8 +18,8 @@ repositories {
 dependencies {
    implementation(project(":common"))
    compileOnly("com.velocitypowered:velocity-api:$velocityApiVersion")
-   implementation("io.netty:netty-codec:$nettyVersion")
-   implementation("io.netty:netty-codec-haproxy:$nettyVersion")
+   compileOnly("io.netty:netty-codec:$nettyVersion")
+   compileOnly("io.netty:netty-codec-haproxy:$nettyVersion")
    implementation("org.yaml:snakeyaml:$snakeYamlVersion")
    implementation("org.bstats:bstats-velocity:$bstatsVelocityVersion")
    implementation(kotlin("stdlib"))
@@ -32,23 +32,14 @@ kotlin {
    }
 }
 
-tasks.register<Copy>("processPluginJson") {
-   group = "build"
-   description = "处理 velocity-plugin.json 中的版本变量"
-
-   from("src/main/resources") {
-       include("velocity-plugin.json")
-       filter { line ->
-           line.replace("\${project.version}", rootProject.version.toString())
-               .replace("\${project.name}", project.name.toString())
-       }
-   }
-   into(layout.buildDirectory.dir("generated/resources/main"))
-}
-
 tasks.processResources {
-   dependsOn("processPluginJson")
-   exclude("velocity-plugin.json")
+    duplicatesStrategy = DuplicatesStrategy.INCLUDE
+    filesMatching("velocity-plugin.json") {
+        filter { line ->
+            line.replace("\${project.version}", rootProject.version.toString())
+                .replace("\${project.name}", project.name.toString())
+        }
+    }
 }
 
 sourceSets.main {

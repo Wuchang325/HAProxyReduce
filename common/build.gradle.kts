@@ -12,13 +12,13 @@ repositories {
 }
 
 dependencies {
-    implementation("org.yaml:snakeyaml:$snakeYamlVersion")
-    implementation("io.netty:netty-codec:$nettyVersion")
-    implementation("io.netty:netty-codec-haproxy:$nettyVersion")
-    implementation("commons-validator:commons-validator:1.7")
-    implementation("org.bstats:bstats-base:$bstatsBaseVersion")
-    implementation("org.slf4j:slf4j-api:$slf4jVersion")
-    implementation(kotlin("stdlib-jdk8"))
+    compileOnly("org.yaml:snakeyaml:$snakeYamlVersion")
+    compileOnly("io.netty:netty-codec:$nettyVersion")
+    compileOnly("io.netty:netty-codec-haproxy:$nettyVersion")
+    compileOnly("commons-validator:commons-validator:1.7")
+    compileOnly("org.bstats:bstats-base:$bstatsBaseVersion")
+    compileOnly("org.slf4j:slf4j-api:$slf4jVersion")
+    compileOnly(kotlin("stdlib-jdk8"))
 }
 
 kotlin {

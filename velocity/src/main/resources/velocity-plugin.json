@@ -4,5 +4,11 @@
   "version": "${project.version}",
   "main": "top.zient.haproxyreduce.velocity.VelocityMain",
   "description": "同时支持代理和直连连接",
-  "authors": ["Wuchang325"]
+  "authors": ["Wuchang325"],
+  "dependencies": [
+    {
+      "id": "sonar",
+      "optional": true
+    }
+  ]
 }

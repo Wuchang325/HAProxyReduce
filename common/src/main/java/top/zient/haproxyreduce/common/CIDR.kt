@@ -1,6 +1,5 @@
 package top.zient.haproxyreduce.common
 
-import org.apache.commons.validator.routines.InetAddressValidator
 import java.math.BigInteger
 import java.net.InetAddress
 import java.net.UnknownHostException

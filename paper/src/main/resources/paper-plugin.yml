@@ -26,3 +26,10 @@ permissions:
   haproxyreduce.status:
     description: 允许查看 HAProxyReduce 状态
     default: op
+
+dependencies:
+  server:
+    Sonar:
+      load: BEFORE
+      required: false
+      join-classpath: false
